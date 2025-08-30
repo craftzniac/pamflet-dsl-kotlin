@@ -116,6 +116,7 @@ class Tokenizer(val inputchars: String) {
                         '\n' -> {
                             this.handleNewLine()
                         }
+
                         else -> {
                             this.currToken.value += currChar
                         }
@@ -177,17 +178,8 @@ class Tokenizer(val inputchars: String) {
                             handleEscapeSequence(currChar)
                         }
 
-                        in 'a'..'z',
-                        in 'A'..'Z',
-                        '#',
-                        in '0'..'9',
-                        ' ', '-', '_'
-                            -> {
-                            this.currToken.value += currChar
-                        }
-
                         else -> {
-                            todo()
+                            this.currToken.value += currChar
                         }
                     }
                 }
