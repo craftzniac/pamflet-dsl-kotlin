@@ -12,7 +12,8 @@ enum class TokenType {
     PropertyName,
     Equals,
     PropertyValue,
-    Comment
+    Comment,
+    ListItem
 }
 
 enum class TokenizerState {
@@ -21,7 +22,8 @@ enum class TokenizerState {
     Text,
     PropertyName,
     PropertyValue,
-    Comment
+    Comment,
+    ListItem
 }
 
 val nullToken = Token(type = TokenType.Null)
@@ -36,7 +38,6 @@ class Tokenizer(val inputchars: String) {
     val tokens: MutableList<Token> = mutableListOf()
 
     fun tokenize(): List<Token> {
-        println(String.format("\ninputchars::\n%s", this.inputchars))
         while (cursor < inputchars.length) {
             when (this.state) {
                 TokenizerState.StartOfLine -> {
@@ -48,7 +49,7 @@ class Tokenizer(val inputchars: String) {
                         }
 
                         in firstCharOfKeywords() -> {   // is start of a keyword
-
+                            todo()
                         }
 
                         '.' -> {  // possibly the start of property name
@@ -61,21 +62,32 @@ class Tokenizer(val inputchars: String) {
                                 }
 
                                 else -> {
-                                    this.currToken = Token(type = TokenType.Text, ".")
+                                    this.reconsume = true
+                                    this.currToken = Token(type = TokenType.Text, "")
                                     this.switchState(TokenizerState.Text)
                                 }
                             }
                         }
 
-                        '-' -> {  // start of a list item
-
+                        '-' -> {  // possible start of a list item
+                            // peek to see if the next char is a space
+                            val nextChar = peekNextChar()
+                            if (nextChar == ' ') {
+                                this.currToken = Token(type = TokenType.ListItem)
+                                this.advanceCursorBy(1)  // advance over the ' ' character
+                                this.switchState(TokenizerState.ListItem)
+                            } else {
+                                this.reconsume = true
+                                this.currToken = Token(type = TokenType.Text, "")
+                                this.switchState(TokenizerState.Text)
+                            }
                         }
 
-                        '/' -> {   //start of a comment
+                        '/' -> {   // possible start of a comment
                             // check if the next char is a /
                             val nextChar = peekNextChar()
                             if (nextChar == '/') {
-                                this.consumeForwardBy(1) // advance the cursor my 1 index forward
+                                this.advanceCursorBy(1) // advance the cursor my 1 index forward
                                 this.currToken = Token(type = TokenType.Comment)
                                 this.switchState(TokenizerState.Comment)
                             } else {
@@ -87,6 +99,7 @@ class Tokenizer(val inputchars: String) {
                         }
 
                         '[' -> {   // start of a code bloc
+                            todo()
                         }
 
                         else -> {   // start of regular text
@@ -98,6 +111,17 @@ class Tokenizer(val inputchars: String) {
                     }
                 }
 
+                TokenizerState.ListItem -> {
+                    when (val currChar = this.consumeNextChar()) {
+                        '\n' -> {
+                            this.handleNewLine()
+                        }
+                        else -> {
+                            this.currToken.value += currChar
+                        }
+                    }
+                }
+
                 TokenizerState.Data -> {
                     todo()
                 }
@@ -105,8 +129,7 @@ class Tokenizer(val inputchars: String) {
                 TokenizerState.Comment -> {
                     when (val currChar = this.consumeNextChar()) {
                         '\n' -> {
-                            this.flushCurrToken()
-                            this.switchState(TokenizerState.StartOfLine)
+                            this.handleNewLine()
                         }
 
                         '\\' -> {
@@ -131,8 +154,7 @@ class Tokenizer(val inputchars: String) {
                         }
 
                         '\n' -> {
-                            this.flushCurrToken()
-                            this.switchState(TokenizerState.StartOfLine)
+                            this.handleNewLine()
                         }
 
                         '\\' -> {  // possible \n character
@@ -148,10 +170,7 @@ class Tokenizer(val inputchars: String) {
                 TokenizerState.PropertyValue -> {
                     when (val currChar = this.consumeNextChar()) {
                         '\n' -> {
-                            this.flushCurrToken()
-                            this.currToken = Token(type = TokenType.NewLine)
-                            this.flushCurrToken()
-                            this.switchState(TokenizerState.StartOfLine)
+                            this.handleNewLine()
                         }
 
                         '\\' -> {
@@ -176,10 +195,7 @@ class Tokenizer(val inputchars: String) {
                 TokenizerState.Text -> {
                     when (val currChar = this.consumeNextChar()) {
                         '\n' -> {
-                            this.flushCurrToken()
-                            this.currToken = Token(type = TokenType.NewLine)
-                            this.flushCurrToken()
-                            this.switchState(TokenizerState.StartOfLine)
+                            this.handleNewLine()
                         }
 
                         '\\' -> {
@@ -201,17 +217,21 @@ class Tokenizer(val inputchars: String) {
         // peek to see if next char makes for a valid escape sequence
         when (val nextChar = this.peekNextChar()) {
             'n' -> {
-                this.flushCurrToken()
-                this.currToken = Token(type = TokenType.NewLine)
-                this.flushCurrToken()
-                this.consumeForwardBy(1)    // advance cursor forward to consume the 'n'
-                this.switchState(TokenizerState.StartOfLine)
+                this.advanceCursorBy(1)    // advance cursor forward to consume the 'n'
+                this.handleNewLine()
             }
 
             else -> {
                 this.currToken.value += currChar
             }
         }
+    }
+
+    fun handleNewLine() {
+        this.flushCurrToken()
+        this.currToken = Token(type = TokenType.NewLine)
+        this.flushCurrToken()
+        this.switchState(TokenizerState.StartOfLine)
     }
 
     fun flushCurrToken() {
@@ -224,7 +244,10 @@ class Tokenizer(val inputchars: String) {
         }
     }
 
-    fun consumeForwardBy(count: Int): List<Char> {
+    /**
+     * moves the cursor forward by a number of times given by `count` while returning a list of the characters stepped over
+     * */
+    fun advanceCursorBy(count: Int): List<Char> {
         val vals = mutableListOf<Char>()
         repeat(count) {
             vals.add(this.consumeNextChar())
