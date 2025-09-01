@@ -38,17 +38,24 @@ sealed class Element {
 
     data class Text(
         override val id: String = generateId(),
+        override var color: String = "",
+        override var fontSize: String = "1.2rem",
         var content: String = "",
         var textAlign: TextAlign = TextAlign.Center,
-        override var color: String = "",
-        override var fontSize: String = "1.2rem"
     ) : Element()
 
-    object NullElement: Element(){
+    data class List(
+        override val id: String = generateId(),
+        override var color: String = "",
+        override var fontSize: String = "1.2rem",     // there probably has to be conversions?? cos it will be rendered on android
+        var items: MutableList<String> = mutableListOf()
+    ) : Element()
+
+    object NullElement : Element() {
         override val id: String
             get() = "null"
-        override var color: String  = "null"
-        override var fontSize: String =  "null"
+        override var color: String = "null"
+        override var fontSize: String = "null"
     }
 }
 
@@ -59,7 +66,9 @@ enum class ParserState {
     TextElement,
     ElementProp,
     PropName,
-    PropValue
+    PropValue,
+    InitializeListElement,
+    ListElementOptions,
 }
 
 class Parser(val inputchars: String) {
@@ -93,16 +102,18 @@ class Parser(val inputchars: String) {
                             this.switchState(ParserState.TextElement)
                         }
 
-                        TokenType.Null -> {
-
-                        }
-
                         TokenType.PropertyName -> {}
                         TokenType.PropertyValue -> {}
-                        TokenType.Comment -> {}
-                        TokenType.ListItem -> {}
+                        TokenType.ListItem -> {
+                            this.reconsume()
+                            this.switchState(ParserState.InitializeListElement)
+                        }
+
                         TokenType.Keyword -> {}
                         TokenType.KeywordValue -> {}
+                        TokenType.Comment, TokenType.Null -> {
+                            /* ignore it */
+                        }
                     }
                 }
 
@@ -161,6 +172,35 @@ class Parser(val inputchars: String) {
                         }
                     }
                 }
+
+                ParserState.InitializeListElement -> {
+                    this.currElement = Element.List()
+                    this.switchState(ParserState.ListElementOptions)
+                }
+
+                ParserState.ListElementOptions -> {
+                    val token = this.consumeNextToken()
+                    when (token.type) {
+                        TokenType.ListItem -> {
+                            if (this.currElement !is Element.List) {
+                                throw Exception("List element was expected  here but found ${this.currElement} instead")
+                            }
+
+                            (this.currElement as Element.List).items.add(token.value)
+                        }
+
+                        TokenType.PropertyName -> {
+                            this.reconsume()
+                            this.switchState(ParserState.ElementProp)
+                        }
+
+                        else -> {
+                            this.flushCurrElement()
+                            this.reconsume()
+                            this.switchState(ParserState.Data)
+                        }
+                    }
+                }
             }
         }
         this.flushCurrElement()
@@ -168,6 +208,7 @@ class Parser(val inputchars: String) {
     }
 
     fun flushCurrElement() {
+        this.flushCurrElementProp()
         if (this.currElement !is Element.NullElement) {
             this.elements.add(this.currElement)
             this.currElement = Element.NullElement
@@ -184,6 +225,10 @@ class Parser(val inputchars: String) {
                 // figure out if the property is right for that element
                 is Element.Text -> {
                     this.setPropertyOnTextElement(this.currElementProp)
+                }
+
+                is Element.List -> {
+                    this.setPropertyOnListElement(this.currElementProp)
                 }
 
                 else -> {
@@ -217,6 +262,18 @@ class Parser(val inputchars: String) {
                         (this.currElement as Element.Text).textAlign = TextAlign.Right
                     }
                 }
+            }
+        }
+    }
+
+    fun setPropertyOnListElement(prop: ElementProp) {
+        when (prop.name) {
+            "color" -> {
+                this.currElement.color = prop.value
+            }
+
+            "fontSize" -> {
+                this.currElement.fontSize = prop.value
             }
         }
     }
