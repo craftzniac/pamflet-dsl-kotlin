@@ -5,17 +5,17 @@ data class Token(
     var value: String = ""
 )
 
-enum class TokenType {
-    Text,
-    Null,
-    NewLine,
-    PropertyName,
-    Equals,
-    PropertyValue,
-    Comment,
-    ListItem,
-    Keyword,
-    KeywordValue
+enum class TokenType(val label: String) {
+    Text("text"),
+    Null("null"),
+//    NewLine,
+    PropertyName("propertyName"),
+//    Equals,
+    PropertyValue("propertyValue"),
+    Comment("comment"),
+    ListItem("listItem"),
+    Keyword("keyword"),
+    KeywordValue("keywordValue");
 }
 
 enum class TokenizerState {
@@ -39,7 +39,7 @@ class Tokenizer(val inputchars: String) {
     var cursor: Int = 0
     var reconsume = false
     var currToken = nullToken
-    val tokens: MutableList<Token> = mutableListOf()
+    private val tokens: MutableList<Token> = mutableListOf()
 
     fun tokenize(): List<Token> {
         while (cursor < inputchars.length) {
@@ -95,7 +95,7 @@ class Tokenizer(val inputchars: String) {
                         }
 
                         '[' -> {   // start of a code bloc
-                            todo()
+                            TODO()
                         }
 
                         else -> {   // start of regular text
@@ -152,7 +152,7 @@ class Tokenizer(val inputchars: String) {
                 }
 
                 TokenizerState.Data -> {
-                    todo()
+                    TODO()
                 }
 
                 TokenizerState.Comment -> {
@@ -176,8 +176,8 @@ class Tokenizer(val inputchars: String) {
                     when (val currChar = this.consumeNextChar()) {
                         '=' -> {
                             this.flushCurrToken()
-                            this.currToken = Token(type = TokenType.Equals)
-                            this.flushCurrToken()
+//                            this.currToken = Token(type = TokenType.Equals)
+//                            this.flushCurrToken()
                             this.currToken = Token(type = TokenType.PropertyValue)
                             this.switchState(TokenizerState.PropertyValue)
                         }
@@ -249,8 +249,8 @@ class Tokenizer(val inputchars: String) {
 
     fun handleNewLine() {
         this.flushCurrToken()
-        this.currToken = Token(type = TokenType.NewLine)
-        this.flushCurrToken()
+//        this.currToken = Token(type = TokenType.NewLine)
+//        this.flushCurrToken()
         this.switchState(TokenizerState.StartOfLine)
     }
 
@@ -332,8 +332,4 @@ class Tokenizer(val inputchars: String) {
         this.cursor++
         return char;
     }
-}
-
-fun todo(msg: String = "This branch has not yet been implemented") {
-    throw Exception(msg)
 }

@@ -3,7 +3,7 @@ package pamflet
 val testStrings = listOf(
 /* 0 */    """But yet $23 thing to note.\nThis is something""".trimIndent(),
 
-/* 1 */    """But yet $23 things to note.
+/* 1 */    """But yet $23 things\ to note.
 This is something
     """.trimMargin(),
 

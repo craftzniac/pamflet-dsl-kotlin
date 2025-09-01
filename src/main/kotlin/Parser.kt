@@ -1,0 +1,230 @@
+package pamflet.parser
+
+import pamflet.tokenizer.Token
+import pamflet.tokenizer.TokenType
+import pamflet.tokenizer.Tokenizer
+import kotlin.math.floor
+
+enum class TextAlign(val value: String) {
+    Center("center"),
+    Left("left"),
+    Right("right"),
+}
+
+data class ElementProp(
+    var name: String,
+    var value: String = ""
+) {
+    companion object {
+        val Null = ElementProp(name = "null")
+    }
+}
+
+fun generateId(): String {
+    val length = 20
+    var id: String = ""
+    val chars: String = "abcdefghijklmnopqrstuvwxyz0123456789"
+    for (i in 0 until length) {
+        val index = floor(Math.random() * chars.length).toInt()
+        id += chars[index]
+    }
+    return id
+}
+
+sealed class Element {
+    abstract val id: String
+    abstract var color: String
+    abstract var fontSize: String
+
+    data class Text(
+        override val id: String = generateId(),
+        var content: String = "",
+        var textAlign: TextAlign = TextAlign.Center,
+        override var color: String = "",
+        override var fontSize: String = "1.2rem"
+    ) : Element()
+
+    object NullElement: Element(){
+        override val id: String
+            get() = "null"
+        override var color: String  = "null"
+        override var fontSize: String =  "null"
+    }
+}
+
+val nullElementProp = ElementProp.Null
+
+enum class ParserState {
+    Data,   // just read data
+    TextElement,
+    ElementProp,
+    PropName,
+    PropValue
+}
+
+class Parser(val inputchars: String) {
+    private val elements: MutableList<Element> = mutableListOf()
+    var cursor: Int = 0
+    var state: ParserState = ParserState.Data
+    var currElementProp: ElementProp = nullElementProp
+    var currElement: Element = Element.NullElement
+
+    val tokens = run {
+        val tok = Tokenizer(inputchars)
+        tok.tokenize()
+    }
+
+    val reconsume = {
+        this.cursor--
+    }
+
+    fun switchState(newState: ParserState) {
+        this.state = newState
+    }
+
+    fun parse(): List<Element> {
+        while (this.cursor < this.tokens.size) {
+            when (this.state) {
+                ParserState.Data -> {
+                    val token = this.consumeNextToken()
+                    when (token.type) {
+                        TokenType.Text -> {
+                            this.reconsume()
+                            this.switchState(ParserState.TextElement)
+                        }
+
+                        TokenType.Null -> {
+
+                        }
+
+                        TokenType.PropertyName -> {}
+                        TokenType.PropertyValue -> {}
+                        TokenType.Comment -> {}
+                        TokenType.ListItem -> {}
+                        TokenType.Keyword -> {}
+                        TokenType.KeywordValue -> {}
+                    }
+                }
+
+                ParserState.TextElement -> {
+                    val token = this.consumeNextToken()
+                    if (token.type != TokenType.Text) {   // ideally, this block never executes
+                        throw Exception("Expected a text token here but got a ${token.type.label} instead")
+                    }
+
+                    this.currElement = Element.Text(content = token.value)
+                    this.switchState(ParserState.ElementProp)
+                }
+
+                ParserState.ElementProp -> {
+                    val token = this.consumeNextToken()
+                    if (token.type == TokenType.PropertyName) {
+                        this.reconsume()
+                        this.switchState(ParserState.PropName)
+                    } else {
+                        this.flushCurrElement()
+                        this.reconsume()
+                        this.switchState(ParserState.Data)
+                    }
+                }
+
+                ParserState.PropName -> {
+                    val token = this.consumeNextToken()
+                    if (token.type == TokenType.PropertyName) {
+                        this.currElementProp.name = token.value
+                        this.switchState(ParserState.PropValue)
+                    } else {
+                        this.reconsume()
+                        this.switchState(ParserState.Data)
+                    }
+                }
+
+                ParserState.PropValue -> {
+                    val token = this.consumeNextToken()
+                    when (token.type) {
+                        TokenType.PropertyValue -> {
+                            this.currElementProp.value = token.value
+                            this.flushCurrElementProp()
+                            this.switchState(ParserState.ElementProp)
+                        }
+
+                        TokenType.PropertyName -> {
+                            this.flushCurrElementProp()
+                            this.reconsume()
+                            this.switchState(ParserState.PropName)
+                        }
+
+                        else -> {
+                            this.reconsume()
+                            this.flushCurrElement()
+                            this.switchState(ParserState.Data)
+                        }
+                    }
+                }
+            }
+        }
+        this.flushCurrElement()
+        return this.elements
+    }
+
+    fun flushCurrElement() {
+        if (this.currElement !is Element.NullElement) {
+            this.elements.add(this.currElement)
+            this.currElement = Element.NullElement
+        }
+    }
+
+    fun flushCurrElementProp() {
+        if (this.currElement !is Element.NullElement) {
+            // figure out what the element is exactly and
+            when (this.currElement) {
+                Element.NullElement -> {
+                    // do nothing
+                }
+                // figure out if the property is right for that element
+                is Element.Text -> {
+                    this.setPropertyOnTextElement(this.currElementProp)
+                }
+
+                else -> {
+                    TODO()
+                }
+            }
+        }
+    }
+
+    fun setPropertyOnTextElement(prop: ElementProp) {
+        when (prop.name) {
+            "color" -> {
+                this.currElement.color = prop.value
+            }
+
+            "fontSize" -> {
+                this.currElement.fontSize = prop.value
+            }
+
+            "textAlign" -> {
+                when (prop.value) {
+                    TextAlign.Center.value -> {
+                        (this.currElement as Element.Text).textAlign = TextAlign.Center
+                    }
+
+                    TextAlign.Left.value -> {
+                        (this.currElement as Element.Text).textAlign = TextAlign.Left
+                    }
+
+                    TextAlign.Right.value -> {
+                        (this.currElement as Element.Text).textAlign = TextAlign.Right
+                    }
+                }
+            }
+        }
+    }
+
+    fun consumeNextToken(): Token {
+        val token = this.tokens[this.cursor]
+        this.cursor++
+        return token
+    }
+
+}

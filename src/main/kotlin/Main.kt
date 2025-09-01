@@ -1,11 +1,12 @@
 package pamflet
 
-import pamflet.tokenizer.Tokenizer
+import pamflet.parser.Parser
 
 fun main() {
-    val testString = testStrings[7]
-    val tokenizer = Tokenizer(inputchars = testString);
-    val tokens = tokenizer.tokenize()
-    println(String.format("\ninputchars::\n%s\n", testString))
-    println(String.format("\ntokens::\n%s\n", tokens.joinToString(",\n")))
+    val testString = testStrings[4]
+    val parser = Parser(inputchars = testString);
+    val tokens = parser.tokens
+    println(String.format("\ntokens::\n%s\n", tokens.joinToString(", \n")))
+    val elements = parser.parse()
+    println(String.format("\nelements::\n%s\n", elements.joinToString(", \n")))
 }
