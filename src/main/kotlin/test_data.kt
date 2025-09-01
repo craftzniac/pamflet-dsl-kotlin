@@ -39,7 +39,7 @@ What are the various kinds of greetings?
 Lnk https://example.com/hello
     """.trimIndent(),
 
-    /* 6 */ """Audio ./src.mp3""",
+    /* 6 */ """Aud ./src.mp3""",
 
     /* 7 */ """
 What are the various kinds of greetings?
