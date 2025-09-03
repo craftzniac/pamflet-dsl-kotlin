@@ -1,8 +1,11 @@
 package pamflet.parser
 
+import pamflet.tokenizer.Keyword
 import pamflet.tokenizer.Token
 import pamflet.tokenizer.TokenType
 import pamflet.tokenizer.Tokenizer
+import java.net.URI
+import java.net.URL
 import kotlin.math.floor
 
 enum class TextAlign(val value: String) {
@@ -51,11 +54,28 @@ sealed class Element {
         var items: MutableList<String> = mutableListOf()
     ) : Element()
 
+    data class Link(
+        override val id: String = generateId(),
+        override var color: String = "",
+        override var fontSize: String = "1.2rem",
+        var href: String = "",
+        var linkText: String = ""
+    ) : Element()
+
     object NullElement : Element() {
         override val id: String
             get() = "null"
         override var color: String = "null"
         override var fontSize: String = "null"
+    }
+
+    override fun toString(): String {
+        return when (this) {
+            is NullElement -> "Null"
+            is Link -> "Link"
+            is List -> "List"
+            is Text -> "Text"
+        }
     }
 }
 
@@ -69,6 +89,7 @@ enum class ParserState {
     PropValue,
     InitializeListElement,
     ListElementOptions,
+    LinkContent
 }
 
 class Parser(val inputchars: String) {
@@ -109,10 +130,45 @@ class Parser(val inputchars: String) {
                             this.switchState(ParserState.InitializeListElement)
                         }
 
-                        TokenType.Keyword -> {}
+                        TokenType.Keyword -> {
+                            when (Keyword.from(token.value)) {
+                                is Keyword.Aud -> {}
+                                is Keyword.Img -> { }
+                                is Keyword.Lnk -> {
+                                    this.currElement = Element.Link()
+                                    this.switchState(ParserState.LinkContent)
+                                }
+
+                                is Keyword.Invalid -> {}
+                            }
+                        }
+
                         TokenType.KeywordValue -> {}
                         TokenType.Comment, TokenType.Null -> {
                             /* ignore it */
+                        }
+                    }
+                }
+
+                ParserState.LinkContent -> {
+                    if (this.currElement !is Element.Link) {
+                        throw Exception("Expected a link element but got a ${this.currElement} instead")
+                    }
+
+                    val token = this.consumeNextToken()
+                    when (token.type) {
+                        TokenType.KeywordValue -> {
+                            val text = token.value
+                            val (linkText, href) = this.getLinkTextAndHref(token.value)
+                            (this.currElement as Element.Link).href = href
+                            (this.currElement as Element.Link).linkText = linkText
+                            this.switchState(ParserState.ElementProp)
+                        }
+
+                        else -> {
+                            this.flushCurrElement()
+                            this.reconsume()
+                            this.switchState(ParserState.Data)
                         }
                     }
                 }
@@ -219,9 +275,6 @@ class Parser(val inputchars: String) {
         if (this.currElement !is Element.NullElement) {
             // figure out what the element is exactly and
             when (this.currElement) {
-                Element.NullElement -> {
-                    // do nothing
-                }
                 // figure out if the property is right for that element
                 is Element.Text -> {
                     this.setPropertyOnTextElement(this.currElementProp)
@@ -231,23 +284,20 @@ class Parser(val inputchars: String) {
                     this.setPropertyOnListElement(this.currElementProp)
                 }
 
-                else -> {
-                    TODO()
+                is Element.Link -> {
+                    this.setPropertyOnLinkElement(this.currElementProp)
+                }
+
+                Element.NullElement -> {
+                    // do nothing
                 }
             }
         }
     }
 
     fun setPropertyOnTextElement(prop: ElementProp) {
+        if (handleCommonProperty(prop)) return
         when (prop.name) {
-            "color" -> {
-                this.currElement.color = prop.value
-            }
-
-            "fontSize" -> {
-                this.currElement.fontSize = prop.value
-            }
-
             "textAlign" -> {
                 when (prop.value) {
                     TextAlign.Center.value -> {
@@ -266,7 +316,16 @@ class Parser(val inputchars: String) {
         }
     }
 
+    fun setPropertyOnLinkElement(prop: ElementProp) {
+        if (handleCommonProperty(prop)) return
+    }
+
     fun setPropertyOnListElement(prop: ElementProp) {
+        if (handleCommonProperty(prop)) return
+    }
+
+    fun handleCommonProperty(prop: ElementProp): Boolean {
+        var isPropHandled = true
         when (prop.name) {
             "color" -> {
                 this.currElement.color = prop.value
@@ -275,7 +334,10 @@ class Parser(val inputchars: String) {
             "fontSize" -> {
                 this.currElement.fontSize = prop.value
             }
+
+            else -> isPropHandled = false
         }
+        return isPropHandled
     }
 
     fun consumeNextToken(): Token {
@@ -284,4 +346,32 @@ class Parser(val inputchars: String) {
         return token
     }
 
+    /**
+     * parses the link content into link text and href
+     * */
+    fun getLinkTextAndHref(str: String): Pair<String, String> {
+        var href = ""
+        val linkText = mutableListOf<String>()
+
+        val isValidUrl: (String) -> Boolean = { text ->
+            try {
+                URI(text).toURL()
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        str.split(" ").forEach { word ->
+            if (word.isNotEmpty()) {
+                if (isValidUrl(word)) {
+                    href = word
+                } else {
+                    linkText.add(word)
+                }
+            }
+        }
+
+        return linkText.joinToString(" ") to href
+    }
 }

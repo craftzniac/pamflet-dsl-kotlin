@@ -8,9 +8,11 @@ data class Token(
 enum class TokenType(val label: String) {
     Text("text"),
     Null("null"),
-//    NewLine,
+
+    //    NewLine,
     PropertyName("propertyName"),
-//    Equals,
+
+    //    Equals,
     PropertyValue("propertyValue"),
     Comment("comment"),
     ListItem("listItem"),
@@ -19,7 +21,6 @@ enum class TokenType(val label: String) {
 }
 
 enum class TokenizerState {
-    Data,
     StartOfLine,
     Text,
     PropertyName,
@@ -30,9 +31,34 @@ enum class TokenizerState {
     KeywordValue
 }
 
-val nullToken = Token(type = TokenType.Null)
+sealed class Keyword(var value: String) {
+    object Aud : Keyword("Aud")
+    object Lnk : Keyword("Lnk")
+    object Img : Keyword("Img")
 
-val keywords = listOf("Aud", "Lnk", "Img");
+    object Invalid : Keyword("")
+
+    companion object {
+        fun from(str: String): Keyword {
+            return when (str) {
+                Aud.value -> Aud
+                Lnk.value -> Lnk
+                Img.value -> Img
+                else -> {
+                    Invalid.value = str
+                    return Invalid
+                }
+            }
+        }
+
+        fun toList(): List<String> {
+            val validKeywords = listOf(Aud, Lnk, Img)
+            return validKeywords.map { it.value }
+        }
+    }
+}
+
+val nullToken = Token(type = TokenType.Null)
 
 class Tokenizer(val inputchars: String) {
     var state: TokenizerState = TokenizerState.StartOfLine
@@ -109,7 +135,7 @@ class Tokenizer(val inputchars: String) {
                     // peek by 4 chars because even though keywords are 3 chars long, I should make sure the next char after the keyword is a space.
                     // basically I want to test against 'Lnk ' not 'Lnk'
                     val fourChars = peekForwardBy(4, startFromCurrCharPosition = true).first
-                    if (fourChars in keywords.map{ "$it " }) {
+                    if (fourChars in Keyword.toList().map { "$it " }) {
                         this.consumeForwardBy(3)   // consume the next 2 chars of the keyword + 1 (which is the space that follows)
                         this.currToken = Token(type = TokenType.Keyword)
                         this.currToken.value = fourChars.trim()
@@ -149,10 +175,6 @@ class Tokenizer(val inputchars: String) {
                             this.currToken.value += currChar
                         }
                     }
-                }
-
-                TokenizerState.Data -> {
-                    TODO()
                 }
 
                 TokenizerState.Comment -> {
@@ -320,7 +342,7 @@ class Tokenizer(val inputchars: String) {
     }
 
     fun firstCharOfKeywords(): List<Char> {
-        return keywords.map { it[0] }
+        return Keyword.toList().map { it[0] }
     }
 
     fun consumeNextChar(): Char {
