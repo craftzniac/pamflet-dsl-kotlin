@@ -196,7 +196,7 @@ class Tokenizer(val inputchars: String) {
 
                 TokenizerState.PropertyName -> {
                     when (val currChar = this.consumeNextChar()) {
-                        '=' -> {
+                        ':' -> {
                             this.flushCurrToken()
 //                            this.currToken = Token(type = TokenType.Equals)
 //                            this.flushCurrToken()

@@ -18,6 +18,7 @@ This is something
 - Say your - name.
 - another th's to pay
 .answer : 0,2
+.explanation: This is some explanation
     """.trimIndent(),
 
     /* 4 */ """
