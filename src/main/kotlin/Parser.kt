@@ -7,6 +7,7 @@ import pamflet.tokenizer.Tokenizer
 import java.net.URI
 import java.net.URL
 import kotlin.math.floor
+import kotlin.system.exitProcess
 
 enum class TextAlign(val value: String) {
     Center("center"),
@@ -133,7 +134,7 @@ class Parser(val inputchars: String) {
                         TokenType.Keyword -> {
                             when (Keyword.from(token.value)) {
                                 is Keyword.Aud -> {}
-                                is Keyword.Img -> { }
+                                is Keyword.Img -> {}
                                 is Keyword.Lnk -> {
                                     this.currElement = Element.Link()
                                     this.switchState(ParserState.LinkContent)
@@ -160,8 +161,9 @@ class Parser(val inputchars: String) {
                         TokenType.KeywordValue -> {
                             val text = token.value
                             val (linkText, href) = this.getLinkTextAndHref(token.value)
+                            println("linkText::$linkText, href::$href")
                             (this.currElement as Element.Link).href = href
-                            (this.currElement as Element.Link).linkText = linkText
+                            (this.currElement as Element.Link).linkText = linkText.ifEmpty { href }
                             this.switchState(ParserState.ElementProp)
                         }
 
@@ -350,28 +352,73 @@ class Parser(val inputchars: String) {
      * parses the link content into link text and href
      * */
     fun getLinkTextAndHref(str: String): Pair<String, String> {
-        var href = ""
-        val linkText = mutableListOf<String>()
+        val str = str.trim()
+        var quoteContent = ""
+        var text = ""
+        var betweenQuotes = false;
 
-        val isValidUrl: (String) -> Boolean = { text ->
-            try {
-                URI(text).toURL()
-                true
-            } catch (e: Exception) {
-                false
+        for (i in 0 until str.length) {
+            if (str[i] == '"') {
+                betweenQuotes = !betweenQuotes
+                continue
+            }
+            if (betweenQuotes) {
+                quoteContent += str[i]
+            } else {
+                text += str[i]
             }
         }
 
-        str.split(" ").forEach { word ->
-            if (word.isNotEmpty()) {
-                if (isValidUrl(word)) {
-                    href = word
-                } else {
-                    linkText.add(word)
+        text = text.trim()
+        var href = ""
+
+        if (quoteContent.isNotEmpty()) {
+            href = if (isValidUrl(quoteContent)) quoteContent else ""
+            return text.trim() to href.trim()
+        } else {
+            // look at the text to see if there's any url
+            for (i in 0 until text.length) {
+                if (text[i] == 'h') {
+                    val opts = listOf("http://", "https://")
+                    // peek forward starting from current index to see if next char sequence is https:// or http://
+                    if ((text.length - i >= opts[0].length  // bounds checking
+                                && text.substring(i, i + opts[0].length) == opts[0])
+                        ||
+                        (text.length - i >= opts[1].length  // bounds checking
+                                && text.substring(i, i + opts[1].length) == opts[1])
+                    ) {
+                        var tempText = text.take(i)
+                        // beginning at the h until a white space char or end of string
+                        var whiteSpaceIndex = -1;
+                        for (j in i until text.length) {
+                            if (text[j] == ' ') { // once you encounter a space, stop reading url
+                                whiteSpaceIndex = j
+                                break;
+                            } else {
+                                href += text[j]
+                            }
+                        }
+
+                        if (whiteSpaceIndex > 0) {  // whitespace can never be at index 0 since text is trimmed beforehand
+                            tempText += text.substring(whiteSpaceIndex, text.length)
+                            text = tempText
+                        }
+                        break
+                    }
+                    // peek forward to see if next char sequence is ttp://
                 }
             }
+            return text.trim() to href.trim()
         }
-
-        return linkText.joinToString(" ") to href
     }
 }
+
+val isValidUrl: (String) -> Boolean = { text ->
+    try {
+        URI(text).toURL()
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
