@@ -14,11 +14,12 @@ This is something
 .fontSize : 23px""".trimIndent(),
 
     /* 3 */ """
-- Hello again
-- Say your - name.
-- another th's to pay
-.answer : 0,2
+- fruits and vegetables
+- cereals
+- Legumes, and beans
+.correct:1,3
 .explanation: This is some explanation
+.control: false
     """.trimIndent(),
 
     /* 4 */ """
@@ -26,7 +27,7 @@ This is something
         - Hello again
         - Say your - name.
         - another th's to pay
-        .answer : 0,2
+        .correct: 0,2
         .explanation: This is some explanation on why the answer is the answer
         .color : green
     """.trimIndent(),
@@ -41,13 +42,17 @@ What are the various kinds of greetings?
 Lnk "https://example.com/hello" 
     """.trimIndent(),
 
-    /* 6 */ """Aud "src.mp3""",
+    /* 6 */ """Aud "src.mp3
+Img "burning_bush.svg"
+
+Hello, it is I
+    """.trimMargin(),
 
     /* 7 */ """
 What are the various kinds of greetings?
 - Hello again
 - another th's to pay
-.answer : 0
+.correct : 0
     """.trimIndent(),
 
    /* 8 */  """

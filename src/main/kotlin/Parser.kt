@@ -1,13 +1,13 @@
 package pamflet.parser
 
+import pamflet.parser.generateId
 import pamflet.tokenizer.Keyword
 import pamflet.tokenizer.Token
 import pamflet.tokenizer.TokenType
 import pamflet.tokenizer.Tokenizer
 import java.net.URI
-import java.net.URL
+import kotlin.String
 import kotlin.math.floor
-import kotlin.system.exitProcess
 
 enum class TextAlign(val value: String) {
     Center("center"),
@@ -48,6 +48,29 @@ sealed class Element {
         var textAlign: TextAlign = TextAlign.Center,
     ) : Element()
 
+    sealed class Multichoice : Element() {
+        abstract var options: MutableList<String>
+        abstract var explanation: String
+
+        data class SingleSelect(
+            override val id: String = generateId(),
+            override var color: String = "",
+            override var fontSize: String = "1.2rem",
+            override var options: MutableList<String> = mutableListOf(),
+            override var explanation: String = "",
+            var correct: UInt? = null,
+        ) : Multichoice()
+
+        data class MultiSelect(
+            override val id: String = generateId(),
+            override var color: String = "",
+            override var fontSize: String = "1.2rem",
+            override var options: MutableList<String> = mutableListOf(),
+            override var explanation: String = "",
+            var correct: kotlin.collections.List<UInt> = listOf(),
+        ) : Multichoice()
+    }
+
     data class List(
         override val id: String = generateId(),
         override var color: String = "",
@@ -76,6 +99,8 @@ sealed class Element {
             is Link -> "Link"
             is List -> "List"
             is Text -> "Text"
+            is Multichoice.SingleSelect -> "Multichoice.SingleS"
+            is Multichoice.MultiSelect -> "Multichoice.MultiS"
         }
     }
 }
@@ -282,8 +307,16 @@ class Parser(val inputchars: String) {
                     this.setPropertyOnTextElement(this.currElementProp)
                 }
 
+                is Element.Multichoice -> {
+                    this.setPropertyOnMultichoiceElement(this.currElementProp)
+                }
+
                 is Element.List -> {
-                    this.setPropertyOnListElement(this.currElementProp)
+                    if (this.currElementProp.name == "correct") {
+                        this.transformListToMultichoiceAndFlushCurrElementProp()
+                    } else {
+                        this.setPropertyOnListElement(this.currElementProp)
+                    }
                 }
 
                 is Element.Link -> {
@@ -295,6 +328,55 @@ class Parser(val inputchars: String) {
                 }
             }
         }
+    }
+
+    fun transformListToMultichoiceAndFlushCurrElementProp() {
+        if (this.currElement !is Element.List) {
+            throw Exception("Expected List element here found ${this.currElement}")
+        }
+        val element = this.currElement as Element.List
+        val prop = this.currElementProp;
+        if (prop.name != "correct") {
+            throw Exception("Property name 'correct' was expected but found ${prop.name}")
+        }
+        val indexes = prop.value.split(",").map { it.trim() }
+        val correct = mutableListOf<UInt>()
+        for (i in indexes) {
+            val index = i.toUIntOrNull()
+            if (index != null && index < element.items.size.toUInt() && index >= 0u) { // bounds checking
+                correct.add(index);
+            } else {  // clear list if there's even 1 invalid index
+                correct.clear()
+                break;
+            }
+        }
+
+        val multichoice: Element.Multichoice = if (correct.isEmpty() || correct.size == 1) {
+            val ss = Element.Multichoice.SingleSelect(
+                color = element.color,
+                fontSize = element.fontSize,
+                options = element.items,
+            )
+            if (correct.isEmpty()) {
+                ss.correct = null
+            } else {   // correct.size == 1
+                ss.correct = correct[0]
+            }
+
+            ss
+        } else {
+            // multiple indexes
+            val ms = Element.Multichoice.MultiSelect(
+                correct = correct,
+                color = element.color,
+                fontSize = element.fontSize,
+                options = element.items,
+            )
+
+            ms
+        }
+
+        this.currElement = multichoice
     }
 
     fun setPropertyOnTextElement(prop: ElementProp) {
@@ -320,6 +402,13 @@ class Parser(val inputchars: String) {
 
     fun setPropertyOnLinkElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
+    }
+
+    fun setPropertyOnMultichoiceElement(prop: ElementProp) {
+        if (handleCommonProperty(prop)) return
+        when(prop.name){
+            "explanation" -> (this.currElement as Element.Multichoice).explanation = prop.value
+        }
     }
 
     fun setPropertyOnListElement(prop: ElementProp) {
@@ -421,4 +510,3 @@ val isValidUrl: (String) -> Boolean = { text ->
         false
     }
 }
-
