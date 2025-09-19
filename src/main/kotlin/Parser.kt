@@ -1,6 +1,5 @@
 package pamflet.parser
 
-import pamflet.parser.generateId
 import pamflet.tokenizer.Keyword
 import pamflet.tokenizer.Token
 import pamflet.tokenizer.TokenType
@@ -8,6 +7,7 @@ import pamflet.tokenizer.Tokenizer
 import java.net.URI
 import kotlin.String
 import kotlin.math.floor
+import kotlin.system.exitProcess
 
 enum class TextAlign(val value: String) {
     Center("center"),
@@ -37,25 +37,28 @@ fun generateId(): String {
 
 sealed class Element {
     abstract val id: String
-    abstract var color: String
-    abstract var fontSize: String
+
+    sealed class TextualElement : Element() {
+        abstract var color: String
+        abstract var fontSize: String
+    }
 
     data class Text(
         override val id: String = generateId(),
         override var color: String = "",
-        override var fontSize: String = "1.2rem",
+        override var fontSize: String = "",
         var content: String = "",
         var textAlign: TextAlign = TextAlign.Center,
-    ) : Element()
+    ) : TextualElement()
 
-    sealed class Multichoice : Element() {
+    sealed class Multichoice : TextualElement() {
         abstract var options: MutableList<String>
         abstract var explanation: String
 
         data class SingleSelect(
             override val id: String = generateId(),
-            override var color: String = "",
-            override var fontSize: String = "1.2rem",
+            override var color: String,
+            override var fontSize: String,
             override var options: MutableList<String> = mutableListOf(),
             override var explanation: String = "",
             var correct: UInt? = null,
@@ -64,7 +67,7 @@ sealed class Element {
         data class MultiSelect(
             override val id: String = generateId(),
             override var color: String = "",
-            override var fontSize: String = "1.2rem",
+            override var fontSize: String = "",
             override var options: MutableList<String> = mutableListOf(),
             override var explanation: String = "",
             var correct: kotlin.collections.List<UInt> = listOf(),
@@ -74,23 +77,32 @@ sealed class Element {
     data class List(
         override val id: String = generateId(),
         override var color: String = "",
-        override var fontSize: String = "1.2rem",     // there probably has to be conversions?? cos it will be rendered on android
+        override var fontSize: String = "",     // there probably has to be conversions?? cos it will be rendered on android
         var items: MutableList<String> = mutableListOf()
-    ) : Element()
+    ) : TextualElement()
 
     data class Link(
         override val id: String = generateId(),
         override var color: String = "",
-        override var fontSize: String = "1.2rem",
+        override var fontSize: String = "",
         var href: String = "",
         var linkText: String = ""
+    ) : TextualElement()
+
+    data class Image(
+        override val id: String = generateId(),
+        var src: String = "",
+        var altText: String = ""
     ) : Element()
+
+    data class Audio(
+        override val id: String = generateId(),
+        var src: String = ""
+    ): Element()
 
     object NullElement : Element() {
         override val id: String
             get() = "null"
-        override var color: String = "null"
-        override var fontSize: String = "null"
     }
 
     override fun toString(): String {
@@ -101,6 +113,8 @@ sealed class Element {
             is Text -> "Text"
             is Multichoice.SingleSelect -> "Multichoice.SingleS"
             is Multichoice.MultiSelect -> "Multichoice.MultiS"
+            is Image -> "Image"
+            is Audio -> "Audio"
         }
     }
 }
@@ -115,7 +129,9 @@ enum class ParserState {
     PropValue,
     InitializeListElement,
     ListElementOptions,
-    LinkContent
+    LinkContent,
+    ImageContent,
+    AudioSource
 }
 
 class Parser(val inputchars: String) {
@@ -158,8 +174,15 @@ class Parser(val inputchars: String) {
 
                         TokenType.Keyword -> {
                             when (Keyword.from(token.value)) {
-                                is Keyword.Aud -> {}
-                                is Keyword.Img -> {}
+                                is Keyword.Aud -> {
+                                    this.currElement  = Element.Audio()
+                                    this.switchState(ParserState.AudioSource)
+                                }
+                                is Keyword.Img -> {
+                                    this.currElement = Element.Image()
+                                    this.switchState(ParserState.ImageContent)
+                                }
+
                                 is Keyword.Lnk -> {
                                     this.currElement = Element.Link()
                                     this.switchState(ParserState.LinkContent)
@@ -172,6 +195,26 @@ class Parser(val inputchars: String) {
                         TokenType.KeywordValue -> {}
                         TokenType.Comment, TokenType.Null -> {
                             /* ignore it */
+                        }
+                    }
+                }
+
+                ParserState.AudioSource -> {
+                    val token = this.consumeNextToken()
+                    when (token.type) {
+                        TokenType.KeywordValue -> {
+                            val (src, _) = splitQuotedFromText(token.value)
+                            (this.currElement as Element.Audio).src = src
+                            this.switchState(ParserState.ElementProp)
+                        }
+                        TokenType.PropertyName -> {
+                            this.reconsume()
+                            this.switchState(ParserState.ElementProp)
+                        }
+                        else -> {
+                            this.flushCurrElement()
+                            this.reconsume()
+                            this.switchState(ParserState.Data)
                         }
                     }
                 }
@@ -284,6 +327,21 @@ class Parser(val inputchars: String) {
                         }
                     }
                 }
+
+                ParserState.ImageContent -> {
+                    val token = this.consumeNextToken()
+                    if (token.type == TokenType.KeywordValue) {
+                        // parse into src and alt text
+                        val (src, alt) = splitQuotedFromText(token.value);
+                        (this.currElement as Element.Image).src = src
+                        (this.currElement as Element.Image).altText = alt
+                        this.switchState(ParserState.ElementProp)
+                    } else {
+                        this.flushCurrElement()
+                        this.reconsume()
+                        this.switchState(ParserState.Data)
+                    }
+                }
             }
         }
         this.flushCurrElement()
@@ -321,6 +379,14 @@ class Parser(val inputchars: String) {
 
                 is Element.Link -> {
                     this.setPropertyOnLinkElement(this.currElementProp)
+                }
+
+                is Element.Image -> {
+                    this.setPropertyOnImageElement(this.currElementProp)
+                }
+
+                is Element.Audio -> {
+                    this.setPropertyOnAudioElement(this.currElementProp)
                 }
 
                 Element.NullElement -> {
@@ -381,6 +447,7 @@ class Parser(val inputchars: String) {
 
     fun setPropertyOnTextElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
+        if (handleCommonTextualElementProperty(prop)) return
         when (prop.name) {
             "textAlign" -> {
                 when (prop.value) {
@@ -402,33 +469,49 @@ class Parser(val inputchars: String) {
 
     fun setPropertyOnLinkElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
+        if (handleCommonTextualElementProperty(prop)) return
+    }
+
+    fun setPropertyOnImageElement(prop: ElementProp) {
+        if (handleCommonProperty(prop)) return
+    }
+
+    fun setPropertyOnAudioElement(prop: ElementProp){
+        if (handleCommonProperty(prop)) return
     }
 
     fun setPropertyOnMultichoiceElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
-        when(prop.name){
+        if (handleCommonTextualElementProperty(prop)) return
+        when (prop.name) {
             "explanation" -> (this.currElement as Element.Multichoice).explanation = prop.value
         }
     }
 
     fun setPropertyOnListElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
+        if (handleCommonTextualElementProperty(prop)) return
     }
 
-    fun handleCommonProperty(prop: ElementProp): Boolean {
+    fun handleCommonTextualElementProperty(prop: ElementProp): Boolean {
         var isPropHandled = true
+        val currElement = this.currElement as Element.TextualElement
         when (prop.name) {
             "color" -> {
-                this.currElement.color = prop.value
+                currElement.color = prop.value
             }
 
             "fontSize" -> {
-                this.currElement.fontSize = prop.value
+                currElement.fontSize = prop.value
             }
 
             else -> isPropHandled = false
         }
         return isPropHandled
+    }
+
+    fun handleCommonProperty(prop: ElementProp): Boolean {
+        return false
     }
 
     fun consumeNextToken(): Token {
@@ -508,5 +591,27 @@ val isValidUrl: (String) -> Boolean = { text ->
         true
     } catch (e: Exception) {
         false
+    }
+}
+
+data class QuotedSplit(
+    val quoted: String,
+    val otherText: String
+)
+
+/**
+ * extracts the content between double quotes (if any) in a string. Returns both the content of the quoted string and the other non-quoted text
+ * */
+fun splitQuotedFromText(input: String): QuotedSplit {
+    val regex = "\"([^\"\']+)\"".toRegex()
+    val match = regex.find(input)
+
+    return if (match != null) {
+        QuotedSplit(
+            match.groups[1]?.value ?: "",
+            input.replace(match.value, "").trim()
+        )
+    } else {
+        QuotedSplit("", input)
     }
 }

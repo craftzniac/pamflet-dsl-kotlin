@@ -42,10 +42,15 @@ What are the various kinds of greetings?
 Lnk "https://example.com/hello" 
     """.trimIndent(),
 
-    /* 6 */ """Aud "src.mp3
+    /* 6 */ """Aud "src.mp3"
 Img "burning_bush.svg"
 
+
 Hello, it is I
+Img "burning_bush.svg"
+This is some random text
+Img "boy-in-the-yard.png"  this is some text
+Img "the-0clayface.jpg"  this is some text
     """.trimMargin(),
 
     /* 7 */ """

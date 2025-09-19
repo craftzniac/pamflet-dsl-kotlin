@@ -77,6 +77,10 @@ class Tokenizer(val inputchars: String) {
                             handleEscapeSequence(currChar)
                         }
 
+                        '\n' -> {
+                            handleNewLine()
+                        }
+
                         in firstCharOfKeywords() -> {   // is start of a keyword
                             this.switchState(TokenizerState.Keyword)
                         }
@@ -121,7 +125,7 @@ class Tokenizer(val inputchars: String) {
                         }
 
                         '[' -> {   // start of a code bloc
-                            TODO()
+                            // TODO()
                         }
 
                         else -> {   // start of regular text
@@ -151,7 +155,6 @@ class Tokenizer(val inputchars: String) {
                 TokenizerState.KeywordValue -> {
                     when (val currChar = this.consumeNextChar()) {
                         '\n' -> {
-                            println("currToken before flush:: ${this.currToken}")
                             handleNewLine()
                         }
 
@@ -281,6 +284,7 @@ class Tokenizer(val inputchars: String) {
             if (this.currToken.type == TokenType.PropertyName || this.currToken.type == TokenType.PropertyValue) {
                 this.currToken.value = this.currToken.value.trim()
             }
+            println("crrTok:: ${this.currToken}");
             this.tokens.add(this.currToken)
             this.currToken = nullToken
         }
