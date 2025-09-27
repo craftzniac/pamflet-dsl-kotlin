@@ -7,12 +7,13 @@ import pamflet.tokenizer.Tokenizer
 import java.net.URI
 import kotlin.String
 import kotlin.math.floor
-import kotlin.system.exitProcess
 
 enum class TextAlign(val value: String) {
     Center("center"),
     Left("left"),
     Right("right"),
+    Start("start"),
+    End("end"),
 }
 
 data class ElementProp(
@@ -98,7 +99,7 @@ sealed class Element {
     data class Audio(
         override val id: String = generateId(),
         var src: String = ""
-    ): Element()
+    ) : Element()
 
     object NullElement : Element() {
         override val id: String
@@ -175,9 +176,10 @@ class Parser(val inputchars: String) {
                         TokenType.Keyword -> {
                             when (Keyword.from(token.value)) {
                                 is Keyword.Aud -> {
-                                    this.currElement  = Element.Audio()
+                                    this.currElement = Element.Audio()
                                     this.switchState(ParserState.AudioSource)
                                 }
+
                                 is Keyword.Img -> {
                                     this.currElement = Element.Image()
                                     this.switchState(ParserState.ImageContent)
@@ -207,10 +209,12 @@ class Parser(val inputchars: String) {
                             (this.currElement as Element.Audio).src = src
                             this.switchState(ParserState.ElementProp)
                         }
+
                         TokenType.PropertyName -> {
                             this.reconsume()
                             this.switchState(ParserState.ElementProp)
                         }
+
                         else -> {
                             this.flushCurrElement()
                             this.reconsume()
@@ -451,17 +455,11 @@ class Parser(val inputchars: String) {
         when (prop.name) {
             "textAlign" -> {
                 when (prop.value) {
-                    TextAlign.Center.value -> {
-                        (this.currElement as Element.Text).textAlign = TextAlign.Center
-                    }
-
-                    TextAlign.Left.value -> {
-                        (this.currElement as Element.Text).textAlign = TextAlign.Left
-                    }
-
-                    TextAlign.Right.value -> {
-                        (this.currElement as Element.Text).textAlign = TextAlign.Right
-                    }
+                    TextAlign.Center.value -> (this.currElement as Element.Text).textAlign = TextAlign.Center
+                    TextAlign.Left.value -> (this.currElement as Element.Text).textAlign = TextAlign.Left
+                    TextAlign.Right.value -> (this.currElement as Element.Text).textAlign = TextAlign.Right
+                    TextAlign.Start.value -> (this.currElement as Element.Text).textAlign = TextAlign.Start
+                    TextAlign.End.value -> (this.currElement as Element.Text).textAlign = TextAlign.End
                 }
             }
         }
@@ -476,7 +474,7 @@ class Parser(val inputchars: String) {
         if (handleCommonProperty(prop)) return
     }
 
-    fun setPropertyOnAudioElement(prop: ElementProp){
+    fun setPropertyOnAudioElement(prop: ElementProp) {
         if (handleCommonProperty(prop)) return
     }
 

@@ -65,6 +65,11 @@ Some text that needs reading
 // this is a comment
 Even some more text
 .fontSize : lg
+   """.trimIndent(),
+
+   /* 9 */  """
+This is a test string for text alignment
+.textAlign: end
    """.trimIndent()
 
 )
