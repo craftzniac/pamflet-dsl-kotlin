@@ -2,8 +2,8 @@ plugins {
     kotlin("jvm") version "2.2.0"
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "org.example.pamflet-dsl"
+version = "1.0"
 
 repositories {
     mavenCentral()

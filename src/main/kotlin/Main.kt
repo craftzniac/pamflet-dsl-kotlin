@@ -3,7 +3,7 @@ package pamflet
 import pamflet.parser.Parser
 
 fun main() {
-    val testString = testStrings[5]
+    val testString = testStrings[8]
     val parser = Parser(inputchars = testString);
     val tokens = parser.tokens
     println(String.format("\ntokens::\n%s\n", tokens.joinToString(", \n")))
