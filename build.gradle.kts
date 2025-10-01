@@ -6,8 +6,8 @@ plugins {
 val appName = "pamflet-dsl"
 val repoName = "pamflet-dsl-kotlin"
 
-group = "org.example.$appName"
-version = "0.1.0"
+group = "io.github.craftzniac"
+version = "0.1.2"
 
 repositories {
     mavenCentral()
