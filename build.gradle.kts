@@ -7,7 +7,7 @@ val appName = "pamflet-dsl"
 val repoName = "pamflet-dsl-kotlin"
 
 group = "io.github.craftzniac"
-version = "0.1.2"
+version = "0.1.3"
 
 repositories {
     mavenCentral()
