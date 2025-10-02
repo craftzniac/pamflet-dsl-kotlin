@@ -120,8 +120,6 @@ sealed class Element {
     }
 }
 
-val nullElementProp = ElementProp.Null
-
 enum class ParserState {
     Data,   // just read data
     TextElement,
@@ -139,7 +137,7 @@ class Parser(val inputchars: String) {
     private val elements: MutableList<Element> = mutableListOf()
     var cursor: Int = 0
     var state: ParserState = ParserState.Data
-    var currElementProp: ElementProp = nullElementProp
+    var currElementProp: ElementProp = ElementProp.Null
     var currElement: Element = Element.NullElement
 
     val tokens = run {
@@ -260,6 +258,7 @@ class Parser(val inputchars: String) {
                 ParserState.ElementProp -> {
                     val token = this.consumeNextToken()
                     if (token.type == TokenType.PropertyName) {
+                        this.currElementProp = ElementProp(name = "")
                         this.reconsume()
                         this.switchState(ParserState.PropName)
                     } else {
@@ -397,6 +396,9 @@ class Parser(val inputchars: String) {
                     // do nothing
                 }
             }
+
+            // set curr element prop to the null element prop
+            this.currElementProp = ElementProp.Null
         }
     }
 

@@ -34,10 +34,12 @@ This is something
 
     /* 5 */ """
 Lnk http://www.example.com/idontevenknow/sk hello world 
+.color: green
 
 What are the various kinds of greetings?
 - Hello again
 - another th's to pay
+.fontSize: lg
 
 Lnk "https://example.com/hello" 
     """.trimIndent(),
