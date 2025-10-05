@@ -55,6 +55,8 @@ sealed class Element {
     sealed class Multichoice : TextualElement() {
         abstract var options: MutableList<String>
         abstract var explanation: String
+        abstract var colorCorrect: String
+        abstract var colorIncorrect: String
 
         data class SingleSelect(
             override val id: String = generateId(),
@@ -62,6 +64,8 @@ sealed class Element {
             override var fontSize: String,
             override var options: MutableList<String> = mutableListOf(),
             override var explanation: String = "",
+            override var colorCorrect: String = "",
+            override var colorIncorrect: String = "",
             var correct: UInt? = null,
         ) : Multichoice()
 
@@ -71,6 +75,8 @@ sealed class Element {
             override var fontSize: String = "",
             override var options: MutableList<String> = mutableListOf(),
             override var explanation: String = "",
+            override var colorCorrect: String = "",
+            override var colorIncorrect: String = "",
             var correct: kotlin.collections.List<UInt> = listOf(),
         ) : Multichoice()
     }
@@ -485,6 +491,8 @@ class Parser(val inputchars: String) {
         if (handleCommonTextualElementProperty(prop)) return
         when (prop.name) {
             "explanation" -> (this.currElement as Element.Multichoice).explanation = prop.value
+            "colorCorrect" -> (this.currElement as Element.Multichoice).colorCorrect = prop.value
+            "colorIncorrect" -> (this.currElement as Element.Multichoice).colorIncorrect = prop.value
         }
     }
 

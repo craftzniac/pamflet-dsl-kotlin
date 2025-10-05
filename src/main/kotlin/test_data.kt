@@ -30,6 +30,8 @@ This is something
         .correct: 0,2
         .explanation: This is some explanation on why the answer is the answer
         .color : green
+        .colorIncorrect: blue
+        .colorCorrect: 
     """.trimIndent(),
 
     /* 5 */ """
