@@ -31,6 +31,7 @@ possible values include any css named color (e.g blue, green, rebeccapurple) or 
 ```
 
 ##### 3. Multichoice
+There are 2 variants to the multichoice element; single select and multi select
 ###### Single select
 ```
 - Hello again
